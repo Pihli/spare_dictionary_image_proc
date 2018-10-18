@@ -75,4 +75,4 @@ def Get_PG( im,win, ps ,nlsp,step,delta):
                     Px0.append(X_nl)
                 else:
                     Px.append(X_nl)
-    return Px, Px0
+    return np.concatenate(Px,axis=1), np.concatenate(Px0,axis=1)
