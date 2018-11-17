@@ -1,74 +1,71 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Oct 20 21:03:24 2018
-
-@author: Touch
-"""
 import numpy as np
 
 
-#def expectation(X, model,nlsp):
-#    means = model.means;
-#    covs = model.covs;
-#    w = model.mixweights;
-#    
-#    n = X.size[1]/nlsp;
-#    k = size(means,2);
-#    logRho = zeros(n,k);
-#    
-#    for i in range(k):
-#        TemplogRho = loggausspdf(X,means[:,i],covs[:,:,i]);
-#        Temp = reshape(TemplogRho,[nlsp n]);
-#        logRho(:,i) = sum(Temp);
-#    end
-#    logRho = bsxfun(@plus,logRho,log(w));
-#    T = logsumexp(logRho,2);
-#    llh = sum(T)/n; % loglikelihood
-#    logR = bsxfun(@minus,logRho,T);
-#    R = exp(logR);
-#    return R, llh
+def expectation(X, model, nlsp):
+    means = model.means
+    covs = model.covs
+    w = model.mixweights
+
+    n = X.size[1] / nlsp
+    k = means.shape[1]
+    logRho = np.zeros([n, k])
+
+    for i in range(k):
+        TemplogRho = loggausspdf(X, means[:, i], covs[:, :, i])
+        Temp = TemplogRho.reshape([nlsp, n])
+        logRho[:, i] = Temp.sum(axis=0)
+    logRho = logRho + np.log(w)
+    T = logsumexp(logRho, 2)
+    llh = sum(T) / n
+    logR = logRho - T
+    R = np.exp(logR)
+    return R, llh
 
 
-def initialization(X, init,nlsp):
-    index = np.arange(0,nlsp,size(X,2))
-    X = X[:,index]
-    [d,n] = size(X);
+def loggausspdf(*args):
+    pass
+
+
+def logsumexp(*args):
+    pass
+
+
+def initialization(X, init, nlsp):
+    index = np.arange(0, nlsp, X.shape[1])
+    X = X[:, index]
+    [d, n] = X.shape
     if type(init) is dict:  # initialize with a model
-        R  = expectation(X,init)
+        R = expectation(X, init, None)
     elif len(init) == 1:  # random initialization
         k = init
-        idx = np.random.randint(n,size = [k,1])
-        m = X[:,idx]
-        label = (np.matmul(m.T,X)-(m*m).T.sum(axis=1)/2).argmax(axis=0)
-        [u,~,label] = unique(label);
-        while k ~= length(u)
-            idx = randsample(n,k);
-            m = X(:,idx);
-            [~,label] = max(bsxfun(@minus,m'*X,dot(m,m,1)'/2),[],1);
-            [u,~,label] = unique(label);
-        end
-        R = full(sparse(1:n,label,1,n,k,n));
-    elseif size(init,1) == 1 && size(init,2) == n  % initialize with labels
-        label = init;
-        k = max(label);
-        R = full(sparse(1:n,label,1,n,k,n));
-    elseif size(init,1) == d  %initialize with only centers
-        k = size(init,2);
-        m = init;
-        [~,label] = max(bsxfun(@minus,m'*X,dot(m,m,1)'/2),[],1);
-        R = full(sparse(1:n,label,1,n,k,n));
-    else
-        error('ERROR: init is not valid.');
-    end
+        idx = np.random.choice(n, k, replace=False)
+        m = X[:, idx]
+        label = (np.matmul(m.T, X) - np.sum(m * m, axis=0).reshape([-1, 1]) / 2).argmax(axis=0)
+        u, label = np.unique(label, return_inverse=True)
+        while k != len(u):
+            idx = np.random.choice(n, k, replace=False)
+            m = X[:, idx]
+            label = np.argmax(np.matmul(m.T, X) - np.sum(m * m, axis=0).reshape([-1, 1]) / 2, axis=0)
+            u, label = np.unique(label, return_inverse=True)
+        R = np.zeros([n, k])
+        R[np.arange(n), label] = 1
+    elif init.shape[0] == 1 and init.shape[1] == n:
+        label = init
+        k = max(label)
+        R = np.zeros([n, k])
+        R[np.arange(n), label] = 1
+    elif init.shape[0] == d:
+        k = init.shape[1]
+        m = init
+        label = np.argmax(np.matmul(m.T, X) - np.sum(m * m, axis=0).reshape([-1, 1]) / 2, axis=0)
+        R = np.zeros([n, k])
+        R[np.arange(n), label] = 1
+    else:
+        raise ('ERROR: init is not valid.')
     return R
 
 
-
-
-
-
-#[model,llh,label]= emgm(X, init,nlsp)
-def emgm(X, init,nlsp):
+# [model,llh,label]= emgm(X, init,nlsp)
+def emgm(X, init, nlsp):
     print("EM for PG-GMM: running ... ")
-    R = intialization(X,init,nlsp)
-    
+    R = initialization(X, init, nlsp)
