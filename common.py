@@ -1,48 +1,22 @@
 import numpy as np
-
-
-def expectation(X, model, nlsp):
-    means = model.means
-    covs = model.covs
-    w = model.mixweights
-
-    n = X.size[1] / nlsp
-    k = means.shape[1]
-    logRho = np.zeros([n, k])
-
-    for i in range(k):
-        TemplogRho = loggausspdf(X, means[:, i], covs[:, :, i])
-        Temp = TemplogRho.reshape([nlsp, n])
-        logRho[:, i] = Temp.sum(axis=0)
-    logRho = logRho + np.log(w)
-    T = logsumexp(logRho, 2)
-    llh = sum(T) / n
-    logR = logRho - T
-    R = np.exp(logR)
-    return R, llh
-
-
-def loggausspdf(*args):
-    pass
-
-
-def logsumexp(*args):
-    pass
+from expectation import expectation
+from maximization import maximization
 
 
 def initialization(X, init, nlsp):
-    index = np.arange(0, nlsp, X.shape[1])
+    print("initialization")
+    index = np.arange(0, X.shape[1], nlsp)
     X = X[:, index]
     [d, n] = X.shape
     if type(init) is dict:  # initialize with a model
         R = expectation(X, init, None)
-    elif len(init) == 1:  # random initialization
+    elif init.size == 1:  # random initialization
         k = init
         idx = np.random.choice(n, k, replace=False)
         m = X[:, idx]
         label = (np.matmul(m.T, X) - np.sum(m * m, axis=0).reshape([-1, 1]) / 2).argmax(axis=0)
         u, label = np.unique(label, return_inverse=True)
-        while k != len(u):
+        while k != u.size:
             idx = np.random.choice(n, k, replace=False)
             m = X[:, idx]
             label = np.argmax(np.matmul(m.T, X) - np.sum(m * m, axis=0).reshape([-1, 1]) / 2, axis=0)
@@ -69,3 +43,32 @@ def initialization(X, init, nlsp):
 def emgm(X, init, nlsp):
     print("EM for PG-GMM: running ... ")
     R = initialization(X, init, nlsp)
+    label = R.argmax(axis=1)
+    R = R[:, np.unique(label)]
+
+    tol = 1e-10
+    maxiter = 100
+    llh = -np.inf * np.ones(maxiter, dtype=np.float16)
+    converged = False
+    t = 0
+    while not converged and t < maxiter:
+        t += 1
+        model = maximization(X, R, nlsp)
+        R, llh[t] = expectation(X, model, nlsp)
+        print('Iteration %d of %d, logL: %.2f' % (t, maxiter, llh[t]))
+        # subplot(1, 2, 1)
+        # plot(llh(1: t), 'o-')
+        label = R.argmax(axis=1)
+        u = np.unique(label)
+        if R.shape[1] != u.size:
+            R = R[:, u]
+        # remove empty components
+        else:
+            converged = llh[t] - llh[t - 1] < tol * abs(llh[t])
+
+    model["k"] = R.shape[1]
+    if converged:
+        print('Converged in %d steps.' % t - 1)
+    else:
+        print('Not converged in %d steps.' % maxiter)
+    return model, llh, label
