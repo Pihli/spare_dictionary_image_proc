@@ -8,17 +8,17 @@ def maximization(X, R, nlsp):
     k = R.shape[1]
 
     nk = R.sum(axis=0)
-    w = nk / n
+    w = nk / nk.sum()
     means = np.matmul(X, R) / nk
 
-    Sigma = np.zeros([d, d, k], np.float32)
+    Sigma = np.zeros([k, d, d], np.float32)
     sqrtR = np.sqrt(R)
 
     for i in range(k):
         Xo = X - means[:, i].reshape([-1, 1])
         Xo = Xo * sqrtR[:, i].reshape([1, -1])
-        Sigma[:, :, i] = np.matmul(Xo, Xo.T) / nk[i]
-        Sigma[:, :, i] = Sigma[:, :, i] + np.eye(d) * (1e-6)
+        Sigma[i, :, :] = np.matmul(Xo, Xo.T) / nk[i]
+        Sigma[i, :, :] = Sigma[i, :, :] + np.eye(d) * (1e-6)
 
     model = dict()
     model["dim"] = d

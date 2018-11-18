@@ -68,7 +68,7 @@ def emgm(X, init, nlsp):
 
     model["k"] = R.shape[1]
     if converged:
-        print('Converged in %d steps.' % t - 1)
+        print('Converged in %d steps.' % (t - 1))
     else:
         print('Not converged in %d steps.' % maxiter)
     return model, llh, label
